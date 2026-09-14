@@ -78,7 +78,6 @@ func TestRunDebouncesBurstIntoOneSync(t *testing.T) {
 	}))
 	t.Cleanup(authentik.Close)
 
-	// Long reconcile interval so only the webhook-triggered syncs count.
 	syncer := newTestSyncer(t, authentik.URL, 50*time.Millisecond, 10*time.Millisecond, time.Hour)
 	handler := syncer.Handler()
 
@@ -86,7 +85,6 @@ func TestRunDebouncesBurstIntoOneSync(t *testing.T) {
 	t.Cleanup(cancel)
 	go syncer.Run(ctx)
 
-	// Startup sync fires immediately; let it land before the burst.
 	time.Sleep(20 * time.Millisecond)
 	startupCount := syncCount.Load()
 
@@ -124,7 +122,6 @@ func TestRunReconcileTicksTriggerSync(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	// Startup sync plus at least two reconcile ticks in 100ms at a 30ms period.
 	if got := syncCount.Load(); got < 3 {
 		t.Errorf("sync count = %d, want at least 3 (startup + reconcile ticks)", got)
 	}

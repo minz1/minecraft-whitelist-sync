@@ -1,6 +1,3 @@
-// Command minecraft-whitelist-sync runs the whitelistsync.Syncer as a long
-// -lived service: an HTTP server for Authentik's webhook, plus the
-// background debounce and reconcile loop.
 package main
 
 import (

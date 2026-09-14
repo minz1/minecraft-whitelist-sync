@@ -58,7 +58,6 @@ func TestRCONRecvShortPacket(t *testing.T) {
 	defer server.Close()
 
 	go func() {
-		// A packet body shorter than header+trailer (8+2 bytes) is malformed.
 		_, _ = server.Write([]byte{3, 0, 0, 0, 1, 2, 3})
 	}()
 

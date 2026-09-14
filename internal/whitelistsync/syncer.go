@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-// Syncer drives the whitelist sync loop and serves the webhook endpoint
-// that triggers it.
 type Syncer struct {
 	cfg     Config
 	log     *slog.Logger
@@ -19,10 +17,6 @@ type Syncer struct {
 	trigger chan struct{}
 }
 
-// New builds a Syncer. The returned client presents cfg's client
-// certificate to Authentik, re-reading it from disk on every TLS handshake
-// so a certificate renewed by an external process (e.g. ACME) takes effect
-// without a restart.
 func New(cfg Config, log *slog.Logger) *Syncer {
 	reloader := newCertReloader(cfg.ClientCertPath, cfg.ClientKeyPath)
 	client := &http.Client{
@@ -35,17 +29,13 @@ func New(cfg Config, log *slog.Logger) *Syncer {
 	}
 
 	return &Syncer{
-		cfg:    cfg,
-		log:    log,
-		client: client,
-		// Buffered 1: a queued sync already covers any signal that arrives
-		// while it waits, so extra triggers are dropped rather than piling up.
+		cfg:     cfg,
+		log:     log,
+		client:  client,
 		trigger: make(chan struct{}, 1),
 	}
 }
 
-// Handler serves POST /whitelist/notify: a bearer-token-gated trigger that
-// ignores its body and always re-syncs the full whitelist.
 func (s *Syncer) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /whitelist/notify", func(w http.ResponseWriter, r *http.Request) {
@@ -76,8 +66,6 @@ func (s *Syncer) requestSync() {
 	}
 }
 
-// Run performs an immediate sync, then drives the debounce loop and
-// periodic reconcile ticker until ctx is done.
 func (s *Syncer) Run(ctx context.Context) {
 	s.requestSync()
 
@@ -96,10 +84,6 @@ func (s *Syncer) Run(ctx context.Context) {
 	}
 }
 
-// debounce waits for a burst of triggers to settle, enforces the minimum
-// gap since the last sync, then runs one. Authentik's audit log fires
-// model_updated on every login, not just real whitelist changes, so
-// coalescing here is what keeps this from syncing constantly.
 func (s *Syncer) debounce(ctx context.Context) {
 	timer := time.NewTimer(s.cfg.Debounce)
 	defer timer.Stop()
@@ -110,7 +94,7 @@ func (s *Syncer) debounce(ctx context.Context) {
 	}
 
 	select {
-	case <-s.trigger: // drop a second signal that arrived during the wait
+	case <-s.trigger:
 	default:
 	}
 

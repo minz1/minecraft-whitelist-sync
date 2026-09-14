@@ -8,10 +8,6 @@ import (
 	"time"
 )
 
-// certReloader re-reads the client keypair from disk whenever either file's
-// mtime changes, instead of caching it once at process start. The cert this
-// points at is renewed well before this process is expected to restart, so
-// a cache-once TLS client would eventually present an expired cert.
 type certReloader struct {
 	certPath, keyPath string
 

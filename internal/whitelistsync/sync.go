@@ -25,9 +25,6 @@ type authentikUsersPage struct {
 	} `json:"results"`
 }
 
-// fetchDesired pages through Authentik's internal users and returns the
-// minecraft_uuid -> minecraft_username map for every user with both
-// attributes set — the link flow's user_write stage is what populates them.
 func fetchDesired(ctx context.Context, client *http.Client, cfg Config) (map[string]string, error) {
 	desired := make(map[string]string)
 	page := 1
@@ -76,8 +73,6 @@ func fetchUsersPage(ctx context.Context, client *http.Client, cfg Config, page i
 	return &data, nil
 }
 
-// readCurrent tolerates a missing or malformed whitelist.json — a fresh
-// server has no file yet.
 func readCurrent(path string) map[string]string {
 	raw, readErr := os.ReadFile(path)
 	if readErr != nil {
@@ -105,14 +100,9 @@ func writeWhitelist(path string, desired map[string]string) error {
 	if marshalErr != nil {
 		return fmt.Errorf("marshal whitelist: %w", marshalErr)
 	}
-	// 0600, not world-readable: the Minecraft server reads this as a different UID under its
-	// own user namespace, granted via a POSIX ACL on the deployed host instead of the
-	// traditional "other" bits (see hosts/minz-game-0/configuration.nix's tmpfiles rules).
 	return os.WriteFile(path, out, 0o600)
 }
 
-// diffSummary reports additions, removals, and renames between two
-// uuid -> name maps, sorted by name for stable log output.
 func diffSummary(desired, current map[string]string) ([]string, []string, []string) {
 	var added, removed, renamed []string
 	for uuid, name := range desired {
@@ -145,10 +135,6 @@ func mapsEqual(a, b map[string]string) bool {
 	return true
 }
 
-// Sync fetches the desired whitelist from Authentik, writes it if it
-// drifted from disk, and asks the running server to reload it over RCON. An
-// unreachable RCON is logged, not treated as failure — the file is still
-// correct and the server picks it up on its next start.
 func (s *Syncer) Sync(ctx context.Context) error {
 	desired, fetchErr := fetchDesired(ctx, s.client, s.cfg)
 	if fetchErr != nil {

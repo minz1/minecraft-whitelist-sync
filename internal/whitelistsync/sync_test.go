@@ -81,8 +81,6 @@ func TestWriteAndReadWhitelistRoundTrip(t *testing.T) {
 	}
 }
 
-// fakeRCON accepts one connection, authenticates any password, and answers
-// "whitelist reload" — enough for Sync's happy path.
 func fakeRCON(t *testing.T) string {
 	t.Helper()
 	ln, listenErr := net.Listen("tcp", "127.0.0.1:0")
@@ -181,9 +179,6 @@ func TestSyncNoOpWhenUnchanged(t *testing.T) {
 		t.Fatalf("seed whitelist: %v", err)
 	}
 
-	// RCON_HOST points nowhere reachable; if Sync tries to reload despite
-	// no diff, this test's own timeout would eventually notice, but the
-	// real assertion is that it returns quickly without error.
 	cfg := whitelistsync.Config{
 		RCONHost: "127.0.0.1", RCONPort: "1", RCONPassword: "x", RCONTimeout: time.Second,
 		AuthentikURL: authentik.URL, AuthentikToken: "test-token",

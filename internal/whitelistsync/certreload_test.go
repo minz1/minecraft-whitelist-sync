@@ -38,8 +38,6 @@ func TestCertReloaderPicksUpRotatedKeypair(t *testing.T) {
 		t.Error("expected an unchanged keypair to return the cached certificate, not reload")
 	}
 
-	// mtime resolution on some filesystems is coarse; make the change
-	// unambiguous rather than sleeping.
 	writeSelfSignedKeypair(t, certPath, keyPath, "second")
 	future := time.Now().Add(time.Minute)
 	if chtimesErr := os.Chtimes(certPath, future, future); chtimesErr != nil {

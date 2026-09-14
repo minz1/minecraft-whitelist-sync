@@ -13,15 +13,12 @@ import (
 const (
 	rconTypeCommand = 2
 	rconTypeAuth    = 3
-	rconSizeLen     = 4 // the size prefix itself
-	rconHeaderLen   = 8 // request ID + packet type, both int32
-	rconTrailerLen  = 2 // NUL body terminator + NUL packet terminator
+	rconSizeLen     = 4
+	rconHeaderLen   = 8
+	rconTrailerLen  = 2
 	rconFullHeader  = rconSizeLen + rconHeaderLen
 )
 
-// rconSend writes one Source RCON packet: a little-endian size prefix
-// covering everything after itself, a request ID, a packet type, and a
-// NUL-terminated body followed by an extra trailing NUL.
 func rconSend(conn net.Conn, reqID, ptype int32, body string) error {
 	payload := append([]byte(body), 0, 0)
 	bodyLen := rconHeaderLen + len(payload)
@@ -45,7 +42,6 @@ func rconSend(conn net.Conn, reqID, ptype int32, body string) error {
 	return writeErr
 }
 
-// rconRecv reads one Source RCON packet and strips its trailing NULs.
 func rconRecv(conn net.Conn) (int32, int32, string, error) {
 	sizeBuf, readSizeErr := readExact(conn, rconSizeLen)
 	if readSizeErr != nil {
@@ -90,15 +86,11 @@ func readExact(conn net.Conn, n int) ([]byte, error) {
 	return buf, nil
 }
 
-// rconUnavailableError marks a dial failure as tolerable: whitelist.json is
-// still correct, and the server picks it up on its next start.
 type rconUnavailableError struct{ cause error }
 
 func (e *rconUnavailableError) Error() string { return fmt.Sprintf("RCON unavailable: %v", e.cause) }
 func (e *rconUnavailableError) Unwrap() error { return e.cause }
 
-// rconReloadWhitelist authenticates to the Minecraft server's RCON port and
-// issues "whitelist reload".
 func rconReloadWhitelist(ctx context.Context, addr, password string, timeout time.Duration) error {
 	dialer := net.Dialer{Timeout: timeout}
 	conn, dialErr := dialer.DialContext(ctx, "tcp", addr)
