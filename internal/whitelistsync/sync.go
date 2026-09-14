@@ -105,8 +105,10 @@ func writeWhitelist(path string, desired map[string]string) error {
 	if marshalErr != nil {
 		return fmt.Errorf("marshal whitelist: %w", marshalErr)
 	}
-	//nolint:gosec // must stay world-readable: the Minecraft container reads it as a different UID under its own user namespace
-	return os.WriteFile(path, out, 0o644)
+	// 0600, not world-readable: the Minecraft server reads this as a different UID under its
+	// own user namespace, granted via a POSIX ACL on the deployed host instead of the
+	// traditional "other" bits (see hosts/minz-game-0/configuration.nix's tmpfiles rules).
+	return os.WriteFile(path, out, 0o600)
 }
 
 // diffSummary reports additions, removals, and renames between two

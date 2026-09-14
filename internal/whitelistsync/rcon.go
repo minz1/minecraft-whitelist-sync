@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"time"
 )
@@ -15,6 +16,7 @@ const (
 	rconSizeLen     = 4 // the size prefix itself
 	rconHeaderLen   = 8 // request ID + packet type, both int32
 	rconTrailerLen  = 2 // NUL body terminator + NUL packet terminator
+	rconFullHeader  = rconSizeLen + rconHeaderLen
 )
 
 // rconSend writes one Source RCON packet: a little-endian size prefix
@@ -22,25 +24,40 @@ const (
 // NUL-terminated body followed by an extra trailing NUL.
 func rconSend(conn net.Conn, reqID, ptype int32, body string) error {
 	payload := append([]byte(body), 0, 0)
-	size := rconHeaderLen + len(payload)
+	bodyLen := rconHeaderLen + len(payload)
+	if bodyLen > math.MaxInt32 {
+		return fmt.Errorf("rcon body too large: %d bytes", len(payload))
+	}
+	size := int32(bodyLen)
 
-	buf := make([]byte, rconSizeLen, rconSizeLen+size)
-	binary.LittleEndian.PutUint32(buf, uint32(size))           //nolint:gosec // RCON packets are always small
-	buf = binary.LittleEndian.AppendUint32(buf, uint32(reqID)) //nolint:gosec // wire value, sign doesn't matter
-	buf = binary.LittleEndian.AppendUint32(buf, uint32(ptype)) //nolint:gosec // wire value, sign doesn't matter
-	buf = append(buf, payload...)
+	var header [rconFullHeader]byte
+	if _, err := binary.Encode(header[0:4], binary.LittleEndian, size); err != nil {
+		return fmt.Errorf("encode size: %w", err)
+	}
+	if _, err := binary.Encode(header[4:8], binary.LittleEndian, reqID); err != nil {
+		return fmt.Errorf("encode request id: %w", err)
+	}
+	if _, err := binary.Encode(header[8:12], binary.LittleEndian, ptype); err != nil {
+		return fmt.Errorf("encode packet type: %w", err)
+	}
 
-	_, writeErr := conn.Write(buf)
+	_, writeErr := conn.Write(append(header[:], payload...))
 	return writeErr
 }
 
 // rconRecv reads one Source RCON packet and strips its trailing NULs.
 func rconRecv(conn net.Conn) (int32, int32, string, error) {
-	head, readSizeErr := readExact(conn, rconSizeLen)
+	sizeBuf, readSizeErr := readExact(conn, rconSizeLen)
 	if readSizeErr != nil {
 		return 0, 0, "", fmt.Errorf("read size: %w", readSizeErr)
 	}
-	size := binary.LittleEndian.Uint32(head)
+	var size int32
+	if _, err := binary.Decode(sizeBuf, binary.LittleEndian, &size); err != nil {
+		return 0, 0, "", fmt.Errorf("decode size: %w", err)
+	}
+	if size < 0 {
+		return 0, 0, "", fmt.Errorf("negative packet size: %d", size)
+	}
 
 	body, readBodyErr := readExact(conn, int(size))
 	if readBodyErr != nil {
@@ -50,8 +67,13 @@ func rconRecv(conn net.Conn) (int32, int32, string, error) {
 		return 0, 0, "", fmt.Errorf("short packet: %d bytes", len(body))
 	}
 
-	reqID := int32(binary.LittleEndian.Uint32(body[0:4])) //nolint:gosec // wire value, sign doesn't matter
-	ptype := int32(binary.LittleEndian.Uint32(body[4:8])) //nolint:gosec // wire value, sign doesn't matter
+	var reqID, ptype int32
+	if _, err := binary.Decode(body[0:4], binary.LittleEndian, &reqID); err != nil {
+		return 0, 0, "", fmt.Errorf("decode request id: %w", err)
+	}
+	if _, err := binary.Decode(body[4:8], binary.LittleEndian, &ptype); err != nil {
+		return 0, 0, "", fmt.Errorf("decode packet type: %w", err)
+	}
 	return reqID, ptype, string(body[rconHeaderLen : len(body)-rconTrailerLen]), nil
 }
 
